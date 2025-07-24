@@ -1,0 +1,14 @@
+name: profilometry-for-plaque-assays
+display_name: Profilometry For Plaque Assays
+# use 'hidden' to remove plugin from napari hub search results
+visibility: public
+# see https://napari.org/stable/plugins/technical_references/manifest.html#fields for valid categories
+# categories: []
+contributions:
+  commands:
+    - id: profilometry-for-plaque-assays.widget
+      python_name: profilometry_for_plaque_assays._dock_widget:phase_3step_widget
+      title: Phase Shift Reconstruction
+  widgets:
+    - command: profilometry-for-plaque-assays.widget
+      display_name: 3 Step Phase Shift Reconstruction
