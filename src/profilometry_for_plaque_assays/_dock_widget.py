@@ -1,22 +1,21 @@
 """
-打开 Napari 并加载三幅图像
+Open Napari and load three images
 
-创建一个 Shapes 图层（矩形或多边形）
+Create a Shapes layer (rectangle or polygon)
 
-使用形状工具绘制一个 ROI 区域
+Use the shapes tool to draw an ROI
 
-打开并运行你的 widget
+Open and run your widget
 
-选择 "Phase 3-Step Processing" 工具
+Select the "Phase 3-Step Processing" tool
 
-选择三幅图像和 ROI 图层
+Choose the three images and ROI layer
 
-设置比例长度和投影角度
+Set the scale length and projection angle
 
-点击 "Run" 按钮
+Click the "Run" button
 
-执行！
-
+Execute!
 """
 
 import time
@@ -35,12 +34,15 @@ from ._preprocessing import preprocess_image
 
 
 def extract_roi_from_shapes(viewer):
+    """
+    Try to extract the most recent rectangular ROI from Shapes layer.
+    """
     for layer in viewer.layers:
         if isinstance(layer, napari.layers.Shapes):
             print("Found Shapes layer. Shape types:", layer.shape_type)
-            # 确保 layer.shape_type 是一个列表（每个形状一个类型）
+            # Ensure layer.shape_type is a list (each shape has a type)
             if len(layer.data) > 0 and len(layer.shape_type) > 0:
-                # 找到最后一个矩形（或其他形状也可以兼容）
+                # Find the last rectangle (or compatible shape)
                 for i in reversed(range(len(layer.data))):
                     shape_type = layer.shape_type[i]
                     if shape_type in ("rectangle", "rect"):
@@ -69,11 +71,11 @@ def phase_3step_widget(
     angle_deg: float = 60.0,
 ):
     try:
-        # Step 1: ROI 提取
+        # Step 1: Extract ROI coordinates from shapes layer
         roi = extract_roi_from_shapes(viewer)
         print("Extracted ROI:", roi)
         if roi is None:
-            # 引导用户添加矩形
+            # Prompt user to add a rectangle if none found
             shapes_layer = None
             for layer in viewer.layers:
                 if isinstance(layer, napari.layers.Shapes):
@@ -85,12 +87,12 @@ def phase_3step_widget(
                     name="ROI", shape_type="rectangle"
                 )
             shapes_layer.mode = "add_rectangle"
-            show_info("请在图像上拖动绘制一个矩形 ROI，然后再次运行处理。")
+            show_info("Please draw a rectangular ROI on the image and run again.")
             return
 
         x1, y1, x2, y2 = roi
 
-        # Step 2: 裁剪 & 预处理
+        # Step 2: Crop and preprocess the ROI region in each image
         I1_roi = I1_layer[y1:y2, x1:x2]
         I2_roi = I2_layer[y1:y2, x1:x2]
         I3_roi = I3_layer[y1:y2, x1:x2]
@@ -99,13 +101,13 @@ def phase_3step_widget(
         I2p = preprocess_image(I2_roi)
         I3p = preprocess_image(I3_roi)
 
-        # Step 3: 相位处理
+        # Step 3: Phase processing
         phi_wrapped = calculate_wrapped_phase(I1p, I2p, I3p)
         phi_unwrapped = unwrap_phase(phi_wrapped)
         Z = compute_depth(phi_unwrapped, Scalelength, angle_deg)
         Z_flat, plane = remove_plane(Z)
 
-        # Step 4: 显示图层，使用时间戳避免覆盖
+        # Step 4: Display results with timestamp to avoid layer name conflicts
         timestamp = int(time.time())
         viewer.add_image(
             I1p, name=f"I1 (ROI) {timestamp}", colormap="gray", visible=False
@@ -125,7 +127,7 @@ def phase_3step_widget(
             Z_flat, name=f"Height - Plane {timestamp}", colormap="inferno"
         )
 
-        show_info("3-Step Phase Processing 完成！")
+        show_info("3-Step Phase Processing completed successfully!")
 
     except Exception as e:
-        show_error(f"处理失败:\n{str(e)}")
+        show_error(f"Processing failed:\n{str(e)}")
