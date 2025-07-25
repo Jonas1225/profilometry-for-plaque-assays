@@ -18,7 +18,7 @@ This **napari plugin** enables 3-step phase reconstruction and profilometry dept
 
 ## 🔧 Installation
 
-You can install the plugin from source (recommended for development) or package (coming soon):
+You can install the plugin from source (recommended for development) or package:
 
 
 
