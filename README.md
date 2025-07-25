@@ -29,5 +29,5 @@ git clone https://github.com/Jonas1225/profilometry-for-plaque-assays.git
 cd profilometry-for-plaque-assays
 pip install -e .
 
-Or install the plug-in directly
+#Or install the plug-in directly  
 pip install napari-profilometry-plaque-assays
