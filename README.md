@@ -28,3 +28,6 @@ You can install the plugin from source (recommended for development) or package 
 git clone https://github.com/Jonas1225/profilometry-for-plaque-assays.git
 cd profilometry-for-plaque-assays
 pip install -e .
+
+### Or install the plug-in directly
+pip install napari-profilometry-plaque-assays
