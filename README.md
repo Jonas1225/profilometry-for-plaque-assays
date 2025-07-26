@@ -68,16 +68,15 @@ pip install -e .
 
 ## 🛠️ Developer Notes
 profilometry-for-plaque-assays/
-├── src/
-│   └── profilometry_for_plaque_assays/
-│       ├── _phase_3step.py
-│       ├── _control_display.py
-│       ├── _control_camera_hik.py
-│       ├── _capture_pipeline.py
-│       └── ...
-├── napari.yaml
-├── setup.cfg / pyproject.toml
-├── README.md
+- src/
+    - profilometry_for_plaque_assays/
+        - _phase_3step.py
+        - _control_display.py
+        - _control_camera_hik.py
+        - ...
+    - napari.yaml
+    - pyproject.toml
+    - README.md
 
 ---
 
