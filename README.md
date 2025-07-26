@@ -82,7 +82,7 @@ profilometry-for-plaque-assays/
 
 ## Author
 - Jonas1225
-- GitHub: @Jonas1225
+- GitHub: [@Jonas1225](https://github.com/Jonas1225)
 
 
 
