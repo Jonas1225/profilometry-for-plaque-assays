@@ -69,6 +69,7 @@ pip install -e .
 ## 🛠️ Developer Notes
 profilometry-for-plaque-assays/
 - src/
+    - MvImport
     - profilometry_for_plaque_assays/
         - _dock_widget
         - _control_display.py
