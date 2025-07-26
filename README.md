@@ -44,7 +44,7 @@ pip install -e .
 
 ## 🚀 Usage
 - Connect the HIKROBOT camera and Arduino-controlled TFT screen.
-- Open napari (with or without imSwitch).
+- Open napari (with imSwitch).
 - Load the plugin:
 - 3-Step Phase Shift Reconstruction (Capture from TFT + HIK)
 - Click "📸 Capture from Hardware" to begin automated acquisition.
