@@ -70,7 +70,7 @@ pip install -e .
 profilometry-for-plaque-assays/
 - src/
     - profilometry_for_plaque_assays/
-        - _phase_3step.py
+        - _dock_widget
         - _control_display.py
         - _control_camera_hik.py
         - ...
