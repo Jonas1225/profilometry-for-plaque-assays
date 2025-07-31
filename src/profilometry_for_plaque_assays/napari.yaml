@@ -11,4 +11,4 @@ contributions:
       title: Phase Shift Reconstruction
   widgets:
     - command: profilometry-for-plaque-assays.widget
-      display_name: 3 Step Phase Shift Reconstruction
+      display_name: 3-Step Phase Shift Reconstruction (Capture from TFT + HIK)
