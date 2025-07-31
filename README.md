@@ -47,55 +47,69 @@ pip install -e .
 #include <Adafruit_GFX.h>
 #include <Adafruit_RA8875.h>
 
-#define RA8875_CS 5
-#define RA8875_RESET 4
+// â€” Pin wiring â€”
+#define RA8875_SCK    18   // VSPI SCK
+#define RA8875_MISO   19   // VSPI MISO
+#define RA8875_MOSI   23   // VSPI MOSI
+#define RA8875_CS      5   // CS
+#define RA8875_RESET  22   // RST
 
-Adafruit_RA8875 tft = Adafruit_RA8875(RA8875_CS, RA8875_RESET);
+// Only the 2-argument constructor is available
+Adafruit_RA8875 tft(RA8875_CS, RA8875_RESET);
 
-float phase = 0.0;  // global phase controlled via serial
+// Pattern parameters
+const int lineThickness = 4;
+const int lineSpacing   = 20;
+int offsetY = 0;
 
 void setup() {
   Serial.begin(115200);
 
+  // 1) Pulse RST for a clean start
+  pinMode(RA8875_RESET, OUTPUT);
+  digitalWrite(RA8875_RESET, LOW);
+  delay(50);
+  digitalWrite(RA8875_RESET, HIGH);
+  delay(50);
+
+  // 2) Remap the default SPI bus to your VSPI pins + CS
+  //    (SCK, MISO, MOSI, SS)
+  SPI.begin(RA8875_SCK, RA8875_MISO, RA8875_MOSI, RA8875_CS);
+
+  // 3) Initialize the RA8875 at 800Ã—480 (change if your panel differs)
   if (!tft.begin(RA8875_800x480)) {
-    Serial.println("RA8875 not found...");
+    Serial.println("RA8875 not detected!");
     while (1);
   }
-  Serial.println("RA8875 found");
+  Serial.println("RA8875 initialized");
 
+  // 4) Enable display + full backlight
   tft.displayOn(true);
   tft.GPIOX(true);
   tft.PWM1config(true, RA8875_PWM_CLK_DIV1024);
   tft.PWM1out(255);
+
+  // 5) Clear the screen
   tft.fillScreen(RA8875_BLACK);
 }
 
 void loop() {
-  if (Serial.available()) {
-    String command = Serial.readStringUntil('\n');
-    command.trim();
-    if (command == "phase:0") drawHorizontalStripes(0.0);
-    else if (command == "phase:1") drawHorizontalStripes(2.0944); // pi*2/3
-    else if (command == "phase:2") drawHorizontalStripes(4.1888); // pi*4/3
+  // 1) Clear previous frame
+  tft.fillScreen(RA8875_BLACK);
+
+  // 2) Draw horizontal stripes shifted by offsetY
+  int step = lineThickness + lineSpacing;
+  for (int y = (offsetY % step); y < tft.height(); y += step) {
+    tft.fillRect(0, y, tft.width(), lineThickness, RA8875_WHITE);
   }
 
+  // 3) Advance and wrap the offset
+  offsetY = (offsetY + 1) % step;
 
-
-  drawHorizontalStripes(phase);
-  delay(30);
+  // 4) Control scroll speed
+  delay(50);
 }
 
-void drawHorizontalStripes(float phase) {
-  const int width = 800;
-  const int height = 480;
-  const float frequency = 0.3;
-
-  for (int y = 0; y < height; y++) {
-    float value = sin(frequency * y + phase);
-    uint16_t color = (value > 0) ? RA8875_WHITE : RA8875_BLACK;
-    tft.drawLine(0, y, width - 1, y, color);
-  }
-}
 ```
 - Dependencies:
     - numpy, scikit-image, opencv-python, pyserial, magicgui, napari
