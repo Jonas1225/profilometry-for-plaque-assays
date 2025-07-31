@@ -127,8 +127,9 @@ void loop() {
   - Projection Angle (°): angle of projection (default: 60°).
   - Save Directory: folder where outputs will be saved.
   - Save Intermediate Results: enable or disable saving of intermediate TIFF and PNG images.
-- Click the Capture from camera + TFT display button to acquire new images or run the processing on existing layers.
+- Run the processing on existing layers or click the "Capture from camera + TFT display" button to acquire new images. 
 - Processed results and intermediate images will be displayed in Napari and saved to the specified directory.
+
 
 ---
 
