@@ -41,7 +41,7 @@ pip install -e .
 ## 🧪 Requirements
 - Python 3.8–3.11
 - HIKROBOT MVS SDK (for USB camera control)
-- Arduino (for TFT phase control via serial)
+- ESP32 Arduino using RA8875 driver (for TFT display phase control)    
 ```bash
 #include <SPI.h>
 #include <Adafruit_GFX.h>
