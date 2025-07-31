@@ -161,15 +161,14 @@ profilometry-for-plaque-assays/
     - MvImport
     - profilometry_for_plaque_assays/
         - _dock_widget
-        - _control_display.py
-        - _control_camera_hik.py
         - ...
     - napari.yaml
     - pyproject.toml
     - README.md
 
-- _capture_pipeline.py: camera and TFT image acquisition logic.
-- _preprocessing.py: image preprocessing steps.
+- _capture_pipeline.py: fringe sample image acquisition logic.
+- _capture_viewer.py: capture viewer.
+- _preprocessing.py: image preprocessing steps.     
 - _phase_utils.py: phase calculation functions.
 - _convert_height.py: height/depth map computation.
 - _plane_tools.py: planar background removal.
