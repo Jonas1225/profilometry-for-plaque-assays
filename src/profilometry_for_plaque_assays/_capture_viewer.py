@@ -50,3 +50,4 @@ class ViewerImageCapturer:
         """
         Reserved method for releasing resources (currently unused).
         """
+        pass
