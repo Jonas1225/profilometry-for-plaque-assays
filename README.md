@@ -47,69 +47,165 @@ pip install -e .
 #include <Adafruit_GFX.h>
 #include <Adafruit_RA8875.h>
 
-// â€” Pin wiring â€”
+// Pin wiring
 #define RA8875_SCK    18   // VSPI SCK
 #define RA8875_MISO   19   // VSPI MISO
 #define RA8875_MOSI   23   // VSPI MOSI
 #define RA8875_CS      5   // CS
 #define RA8875_RESET  22   // RST
 
-// Only the 2-argument constructor is available
 Adafruit_RA8875 tft(RA8875_CS, RA8875_RESET);
 
 // Pattern parameters
 const int lineThickness = 4;
 const int lineSpacing   = 20;
-int offsetY = 0;
+const int step = lineThickness + lineSpacing;  // Total period = 24 pixels
+
+// Phase control
+int currentPhase = 0;        // 0, 1, or 2 for three phases
+bool patternChanged = true;  // Flag to indicate when to redraw
+unsigned long lastPhaseTime = 0;
+const unsigned long PHASE_DURATION = 1500;  // 1.5 seconds per phase (matches your Python timing)
+
+// Serial command processing
+String serialCommand = "";
+bool commandComplete = false;
 
 void setup() {
   Serial.begin(115200);
-
-  // 1) Pulse RST for a clean start
+  Serial.println("3-Step Profilometry Display Controller");
+  Serial.println("Commands: 'P0', 'P1', 'P2' for phases, 'AUTO' for automatic cycling");
+  
+  // Initialize display
   pinMode(RA8875_RESET, OUTPUT);
   digitalWrite(RA8875_RESET, LOW);
   delay(50);
   digitalWrite(RA8875_RESET, HIGH);
   delay(50);
-
-  // 2) Remap the default SPI bus to your VSPI pins + CS
-  //    (SCK, MISO, MOSI, SS)
+  
   SPI.begin(RA8875_SCK, RA8875_MISO, RA8875_MOSI, RA8875_CS);
-
-  // 3) Initialize the RA8875 at 800Ã—480 (change if your panel differs)
+  
   if (!tft.begin(RA8875_800x480)) {
     Serial.println("RA8875 not detected!");
     while (1);
   }
+  
   Serial.println("RA8875 initialized");
-
-  // 4) Enable display + full backlight
+  
+  // Enable display + full backlight
   tft.displayOn(true);
   tft.GPIOX(true);
   tft.PWM1config(true, RA8875_PWM_CLK_DIV1024);
   tft.PWM1out(255);
-
-  // 5) Clear the screen
-  tft.fillScreen(RA8875_BLACK);
+  
+  // Draw initial phase
+  drawPhasePattern(currentPhase);
+  Serial.println("Ready - Phase 0 displayed");
 }
 
 void loop() {
-  // 1) Clear previous frame
-  tft.fillScreen(RA8875_BLACK);
-
-  // 2) Draw horizontal stripes shifted by offsetY
-  int step = lineThickness + lineSpacing;
-  for (int y = (offsetY % step); y < tft.height(); y += step) {
-    tft.fillRect(0, y, tft.width(), lineThickness, RA8875_WHITE);
+  // Check for serial commands
+  checkSerialCommands();
+  
+  // Auto-cycling mode (comment out if you want manual control only)
+  if (millis() - lastPhaseTime > PHASE_DURATION) {
+    currentPhase = (currentPhase + 1) % 3;
+    patternChanged = true;
+    lastPhaseTime = millis();
+    Serial.print("Auto-switched to Phase ");
+    Serial.println(currentPhase);
   }
-
-  // 3) Advance and wrap the offset
-  offsetY = (offsetY + 1) % step;
-
-  // 4) Control scroll speed
-  delay(50);
+  
+  // Redraw pattern if phase changed
+  if (patternChanged) {
+    drawPhasePattern(currentPhase);
+    patternChanged = false;
+  }
+  
+  delay(10);  // Small delay to prevent overwhelming the system
 }
 
+void drawPhasePattern(int phase) {
+  // Clear screen
+  tft.fillScreen(RA8875_BLACK);
+  
+  // Calculate phase offset in pixels
+  // For 3-step profilometry: Phase 0 = 0°, Phase 1 = 120°, Phase 2 = 240°
+  // Convert to pixel offset: (phase * step) / 3
+  int phaseOffset = (phase * step) / 3;  // 0, 8, 16 pixels for phases 0,1,2
+  
+  // Draw horizontal stripes with phase offset
+  for (int y = phaseOffset; y < tft.height(); y += step) {
+    tft.fillRect(0, y, tft.width(), lineThickness, RA8875_WHITE);
+  }
+  
+  // Debug output
+  Serial.print("Phase ");
+  Serial.print(phase);
+  Serial.print(" drawn with offset ");
+  Serial.print(phaseOffset);
+  Serial.println(" pixels");
+}
+
+void checkSerialCommands() {
+  while (Serial.available()) {
+    char inChar = (char)Serial.read();
+    
+    if (inChar == '\n' || inChar == '\r') {
+      commandComplete = true;
+    } else {
+      serialCommand += inChar;
+    }
+    
+    if (commandComplete) {
+      processCommand(serialCommand);
+      serialCommand = "";
+      commandComplete = false;
+    }
+  }
+}
+
+void processCommand(String command) {
+  command.trim();
+  command.toUpperCase();
+  
+  if (command == "P0") {
+    currentPhase = 0;
+    patternChanged = true;
+    Serial.println("Manual: Phase 0 set");
+  }
+  else if (command == "P1") {
+    currentPhase = 1;
+    patternChanged = true;
+    Serial.println("Manual: Phase 1 set");
+  }
+  else if (command == "P2") {
+    currentPhase = 2;
+    patternChanged = true;
+    Serial.println("Manual: Phase 2 set");
+  }
+  else if (command == "AUTO") {
+    lastPhaseTime = millis();
+    Serial.println("Auto-cycling enabled");
+  }
+  else if (command == "STOP") {
+    // Stop auto-cycling by setting a very long phase duration
+    lastPhaseTime = millis() + 1000000;  // Effectively disable auto-cycling
+    Serial.println("Auto-cycling stopped");
+  }
+  else if (command == "STATUS") {
+    Serial.print("Current phase: ");
+    Serial.println(currentPhase);
+    Serial.print("Pattern: ");
+    Serial.print(lineThickness);
+    Serial.print("px lines, ");
+    Serial.print(lineSpacing);
+    Serial.println("px spacing");
+  }
+  else {
+    Serial.println("Unknown command. Use: P0, P1, P2, AUTO, STOP, STATUS");
+  }
+}
 ```
 - Dependencies:
     - numpy, scikit-image, opencv-python, pyserial, magicgui, napari
@@ -179,3 +275,4 @@ profilometry-for-plaque-assays/
 ## Author
 - Jonas1225
 - GitHub: [@Jonas1225](https://github.com/Jonas1225)
+
