@@ -31,7 +31,8 @@ from napari.utils.notifications import show_error, show_info
 from qtpy.QtWidgets import QWidget
 from skimage.restoration import unwrap_phase
 
-from ._capture_pipeline import capture_three_phase_images
+# CHANGED: Import synchronized capture instead of basic capture
+from ._synchronized_capture_pipeline import capture_three_phase_images
 from ._convert_height import compute_depth
 from ._phase_utils import calculate_wrapped_phase
 from ._plane_tools import remove_plane
@@ -194,6 +195,7 @@ def has_dock_widget(viewer, name: str):
     I3_layer={"label": "Image I3"},
     Scalelength={"label": "TFT Scale Length (m)", "min": 0.001, "step": 0.001},
     angle_deg={"label": "Projection Angle (°)", "min": 0.0, "max": 90.0},
+    esp32_port={"label": "ESP32 Serial Port", "value": "COM3"},  # NEW: Added ESP32 port control
     save_dir={"widget_type": FileEdit, "label": "Save Directory", "mode": "d"},
     save_intermediates={
         "label": "Save Intermediate Results",
@@ -208,6 +210,7 @@ def phase_3step_widget(
     I3_layer: ImageData = None,
     Scalelength: float = 0.062,  # Default TFT display length in meters
     angle_deg: float = 60.0,
+    esp32_port: str = "COM3",  # NEW: Added ESP32 port parameter
     save_dir: str = ".",
     save_intermediates: bool = True,
 ):
@@ -231,8 +234,9 @@ def phase_3step_widget(
         @capture_button.clicked.connect
         def on_capture():
             try:
-                show_info("Capturing images...")
-                I1, I2, I3 = capture_three_phase_images(viewer)
+                show_info("Capturing synchronized images from ESP32...")
+                # CHANGED: Pass ESP32 port to synchronized capture function
+                I1, I2, I3 = capture_three_phase_images(viewer, esp32_port)
 
                 timestamp = int(time.time())
                 os.makedirs(save_dir, exist_ok=True)
