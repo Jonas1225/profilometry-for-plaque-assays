@@ -71,6 +71,11 @@ const unsigned long PHASE_DURATION = 1500;  // 1.5 seconds per phase (matches yo
 String serialCommand = "";
 bool commandComplete = false;
 
+// 🔹 Function prototypes
+void drawPhasePattern(int phase);
+void checkSerialCommands();
+void processCommand(String command);
+
 void setup() {
   Serial.begin(115200);
   Serial.println("3-Step Profilometry Display Controller");
@@ -275,4 +280,5 @@ profilometry-for-plaque-assays/
 ## Author
 - Jonas1225
 - GitHub: [@Jonas1225](https://github.com/Jonas1225)
+
 
