@@ -16,7 +16,7 @@ It integrates with hardware â€” a TFT display and a HIKROBOT industrial camera â
   - Compute wrapped and unwrapped phase
   - Generate depth maps with and without planar background
 - Visualize every intermediate result directly in napar
-- Save raw and processed images in TIFF, PNG, and Numpy .npy formats
+- Save raw and processed images in TIFF, PNG, and Numpy .npz formats
 - Region-of-interest selection via rectangle shapes in Napari
 - Option to enable/disable saving of intermediate results
 
@@ -280,5 +280,6 @@ profilometry-for-plaque-assays/
 ## Author
 - Jonas1225
 - GitHub: [@Jonas1225](https://github.com/Jonas1225)
+
 
 
