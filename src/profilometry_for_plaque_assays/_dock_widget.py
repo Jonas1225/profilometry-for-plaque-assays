@@ -159,8 +159,8 @@ def process_and_display(
             cmap="inferno",
         )
 
-        # Also save raw data as .npy
-        np.save(os.path.join(save_dir, f"Z_Flat_{timestamp}.npy"), Z_flat)
+        # Also save raw data as .npz
+        np.save(os.path.join(save_dir, f"Z_Flat_{timestamp}.npz"), Z_flat) 
         show_info(f"Processing complete. Results saved to: {save_dir}")
 
     # Step 5: Display results in viewer
