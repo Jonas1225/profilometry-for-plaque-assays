@@ -268,7 +268,7 @@ profilometry-for-plaque-assays/
     - pyproject.toml
     - README.md
 
-- _capture_pipeline.py: fringe sample image acquisition logic.
+- _synchronized_capture_pipeline.py: fringe sample image acquisition logic.
 - _capture_viewer.py: capture viewer.
 - _preprocessing.py: image preprocessing steps.     
 - _phase_utils.py: phase calculation functions.
@@ -280,6 +280,7 @@ profilometry-for-plaque-assays/
 ## Author
 - Jonas1225
 - GitHub: [@Jonas1225](https://github.com/Jonas1225)
+
 
 
 
