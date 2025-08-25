@@ -282,262 +282,174 @@ profilometry-for-plaque-assays/
 - GitHub: [@Jonas1225](https://github.com/Jonas1225)
 
 ```bash
+""" 
+Reconstructing the phase (and thus surface height) from a single fringe pattern using a 2D Poisson equation solver is a classic approach in optical metrology and phase retrieval. 
+This method typically uses Fourier-based demodulation to extract phase gradients, followed by solving the Poisson equation to recover the continuous phase or surface height. 
+1.Input: A single fringe pattern image (e.g., sinusoidal intensity pattern) 
+2.Preprocessing: Convert to grayscale, enhance contrast 
+3.Compute gradients: Estimate partial derivatives (∂φ/∂x, ∂φ/∂y) 
+4.Poisson solver: Solve ∇²φ = div(grad φ) to reconstruct φ 
+5.(Optional): Remove plane for flattening 
+6.3D surface drawing 
+"""
 import numpy as np
-import imageio.v2 as imageio
 import matplotlib.pyplot as plt
-from matplotlib.widgets import RectangleSelector
-from skimage.restoration import unwrap_phase
+import imageio.v2 as imageio
+from scipy.ndimage import sobel
+from scipy.fftpack import fft2, ifft2
 from skimage import exposure
-from mpl_toolkits.mplot3d import Axes3D  # Required for 3D plotting
+from matplotlib.widgets import RectangleSelector
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 
-# --- Image Processing Utilities ---
-
+# -------------------------------
+# Convert image to grayscale
+# -------------------------------
 def to_gray(img):
-    """
-    Convert input image to grayscale using standard luminance weights.
-    If image has 4D (e.g., batch dimension), extract the first image.
-    """
-    if img.ndim == 4:
+    if img.ndim == 4 and img.shape[0] == 1:
         img = img[0]
     if img.ndim == 3:
-        # Use standard grayscale conversion formula
-        img = np.dot(img[..., :3], [0.2989, 0.5870, 0.1140])
-    return img.astype(np.float32)
+        gray = np.dot(img[..., :3], [0.2989, 0.5870, 0.1140])  # RGB to grayscale
+    else:
+        gray = img
+    return gray.astype(np.float32)
 
+# -------------------------------
+# Enhance contrast using histogram stretch
+# -------------------------------
 def enhance_contrast(img):
-    """
-    Enhance contrast using 2nd and 98th percentiles (percentile stretch).
-    """
     p2, p98 = np.percentile(img, (2, 98))
     return exposure.rescale_intensity(img, in_range=(p2, p98))
 
-# --- Phase to Depth Calculation ---
+# -------------------------------
+# Compute phase gradients
+# -------------------------------
+def compute_gradients(img):
+    grad_x = sobel(img, axis=1)
+    grad_y = sobel(img, axis=0)
+    return grad_x, grad_y
 
-def compute_depth(unwrapped_phi, Scalelength=0.062, angle_deg=60.0):
-    """
-    Convert unwrapped phase to depth (in mm) using triangulation.
+# -------------------------------
+# Poisson equation solver (∇²φ = div(grad φ))
+# -------------------------------
+def poisson_solver(grad_x, grad_y):
+    h, w = grad_x.shape
+    fx = np.zeros_like(grad_x)
+    fy = np.zeros_like(grad_y)
     
-    Parameters:
-        unwrapped_phi : 2D ndarray of unwrapped phase values (radians)
-        Scalelength   : the width of tft display (meters)
-        angle_deg     : angle between projection and camera (degrees)
+    fx[:, :-1] = grad_x[:, :-1] - grad_x[:, 1:]
+    fy[:-1, :] = grad_y[:-1, :] - grad_y[1:, :]
+    
+    div = fx + fy
+    yy, xx = np.meshgrid(np.fft.fftfreq(h), np.fft.fftfreq(w), indexing='ij')
+    denom = (2 * np.pi * 1j * xx)**2 + (2 * np.pi * 1j * yy)**2
+    denom[0, 0] = 1.0  # avoid division by zero
+    
+    F_div = fft2(div)
+    phi = np.real(ifft2(F_div / denom))
+    phi -= np.min(phi)  # normalize phase origin
+    return phi
 
-    Returns:
-        Depth map in millimeters
-    """
-    pitch_m = Scalelength / 22  # pitch of the projected pattern
+# -------------------------------
+# Convert phase to real-world height (in mm)
+# -------------------------------
+def phase_to_height(unwrapped_phi, Scalelength=0.062, angle_deg=60.0):
+    pitch_m = Scalelength / 22  # based on camera-projector parameters
     angle_rad = np.deg2rad(angle_deg)
     depth_m = (pitch_m / (2 * np.pi * np.tan(angle_rad))) * unwrapped_phi
-    return depth_m * 1000.0  # Convert meters to millimeters
+    return depth_m * 1000.0  # convert to mm
 
-# --- Plane Removal ---
-
-def remove_plane(Z):
-    """
-    Fit a plane Z = ax + by + c to the depth map and subtract it.
-    
-    Returns:
-        Z_flattened: height map with fitted plane removed
-        plane      : the fitted plane
-    """
-    height, width = Z.shape
-    X, Y = np.meshgrid(np.arange(width), np.arange(height))
-    A = np.vstack([X.ravel(), Y.ravel(), np.ones_like(X.ravel())]).T
-    coeffs, _, _, _ = np.linalg.lstsq(A, Z.ravel(), rcond=None)  # Solve Ax = Z
-    plane = (coeffs[0] * X + coeffs[1] * Y + coeffs[2])
-    return Z - plane, plane
-
-# --- Wrapped Phase Calculation ---
-
-def calculate_wrapped_phase(I1, I2, I3):
-    """
-    Calculate wrapped phase using the 3-step phase shifting algorithm.
-    
-    Formula:
-        φ_wrapped = atan2(√3 * (I1 - I3), 2*I2 - I1 - I3)
-    
-    Returns:
-        Wrapped phase in [0, 2π)
-    """
-    phi_wrapped = np.arctan2(np.sqrt(3) * (I1 - I3), 2 * I2 - I1 - I3)
-    return np.mod(phi_wrapped, 2 * np.pi)
-
-# --- Image Preprocessing Pipeline ---
-
-def preprocess_image(path):
-    """
-    Load image, convert to grayscale, and enhance contrast.
-    
-    Parameters:
-        path : file path to image
-
-    Returns:
-        Preprocessed grayscale image
-    """
-    img = imageio.imread(path)
-    gray = to_gray(img)
-    contrast = enhance_contrast(gray)
-    return contrast  # return full image (no cropping)
-
-# --- ROI Selection ---
-
-def select_roi(image):
-    """
-    Launch an interactive matplotlib window for user to select ROI.
-    
-    Returns:
-        ROI coordinates: (x1, y1, x2, y2)
-    """
-    fig, ax = plt.subplots()
-    ax.imshow(image, cmap='gray')
-    plt.title("Drag to select ROI, then close window")
-
-    roi_coords = []
-
-    def onselect(eclick, erelease):
-        # Get rectangle corners from click & release
-        x1, y1 = int(eclick.xdata), int(eclick.ydata)
-        x2, y2 = int(erelease.xdata), int(erelease.ydata)
-        roi_coords.clear()
-        roi_coords.append((min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)))
-
-    # Interactive rectangle tool
-    rect_selector = RectangleSelector(ax, onselect,
-                                      useblit=True,
-                                      button=[1],  # left click
-                                      minspanx=5, minspany=5,
-                                      spancoords='pixels',
-                                      interactive=True)
-    plt.show()
-
-    if roi_coords:
-        return roi_coords[0]
-    else:
-        h, w = image.shape
-        return (0, 0, w, h)
-
-# --- Main Processing Function ---
-
-def process_phase_images(image_paths, Scalelength=0.062, angle_deg=60.0, roi=None):
-    """
-    Full pipeline: load images, calculate phase, unwrap, compute depth.
-    
-    Parameters:
-        image_paths : list of 3 file paths (I1, I2, I3)
-        Scalelength : scale bar length in meters
-        angle_deg   : projection angle in degrees
-        roi         : optional region of interest (x1, y1, x2, y2)
-
-    Returns:
-        Dictionary with images, phase maps, depth map, and plane-removed result
-    """
-    if len(image_paths) != 3:
-        raise ValueError("Exactly 3 phase-shifted images are required.")
-
-    # Load and preprocess images
-    I1, I2, I3 = [preprocess_image(p) for p in image_paths]
-
-    # Select ROI if not provided
-    if roi is None:
-        roi = select_roi(I1)
-    x1, y1, x2, y2 = roi
-
-    # Crop to ROI
-    I1_roi = I1[y1:y2, x1:x2]
-    I2_roi = I2[y1:y2, x1:x2]
-    I3_roi = I3[y1:y2, x1:x2]
-
-    # Phase processing
-    phi_wrapped = calculate_wrapped_phase(I1_roi, I2_roi, I3_roi)
-    phi_unwrapped = unwrap_phase(phi_wrapped)
-
-    # Convert to depth
-    Z = compute_depth(phi_unwrapped, Scalelength, angle_deg)
-
-    # Remove plane for visualization
-    Z_flattened, plane = remove_plane(Z)
-
-    return {
-        'I1': I1_roi, 'I2': I2_roi, 'I3': I3_roi,
-        'phi_wrapped': phi_wrapped,
-        'phi_unwrapped': phi_unwrapped,
-        'Z': Z,
-        'plane': plane,
-        'Z_flattened': Z_flattened,
-        'roi': roi
-    }
-
-# --- Visualization ---
-
-def plot_results(results):
-    """
-    Plot intermediate results and 3D surface.
-    
-    Parameters:
-        results : dict returned by `process_phase_images`
-    """
-    I1, I2, I3 = results['I1'], results['I2'], results['I3']
-    phi_wrapped = results['phi_wrapped']
-    phi_unwrapped = results['phi_unwrapped']
-    Z = results['Z']
-    plane = results['plane']
-    Z_flattened = results['Z_flattened']
-    height, width = Z.shape
-    X, Y = np.meshgrid(np.arange(width), np.arange(height))
-
-    # Plot 8 subplots (images + phase + depth)
-    plt.figure(figsize=(18, 12))
-    titles = [
-        'I1 (Enhanced)', 
-        'I2 (Enhanced)', 
-        'I3 (Enhanced)', 
-        'Wrapped Phase φ (0~2π)', 
-        'Unwrapped Phase Φ (continuous)', 
-        'Original Height Z (mm)', 
-        'Fitted Plane a·x + b·y + c', 
-        'Flattened Z (Z - Plane)'
-    ]
-    images = [I1, I2, I3, phi_wrapped, phi_unwrapped, Z, plane, Z_flattened]
-    cmaps = ['gray']*3 + ['twilight', 'twilight'] + ['jet']*3
-
-    for i in range(8):
-        plt.subplot(2, 4, i+1)
-        plt.title(titles[i])
-        im = plt.imshow(images[i], cmap=cmaps[i])
-        plt.axis('off')
-        plt.colorbar(im, fraction=0.046, pad=0.04)
-
-    plt.tight_layout()
-    plt.show()
-
-    # 3D plot of the surface
+# -------------------------------
+# Plot 3D surface
+# -------------------------------
+def plot_3d_surface(height):
+    h, w = height.shape
+    X, Y = np.meshgrid(np.arange(w), np.arange(h))
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
-    skip = 5  # downsample to speed up rendering
-    ax.plot_surface(X[::skip, ::skip], Y[::skip, ::skip], Z_flattened[::skip, ::skip],
-                    cmap='viridis', edgecolor='none')
-    ax.set_title('3D Surface (Flattened)')
+    skip = 4  # downsampling for speed
+    ax.plot_surface(X[::skip, ::skip], Y[::skip, ::skip], height[::skip, ::skip],
+                    cmap=cm.viridis, edgecolor='none')
+    ax.set_title('3D Reconstructed Surface (Height in mm)')
     ax.set_xlabel('X (pixels)')
     ax.set_ylabel('Y (pixels)')
     ax.set_zlabel('Height (mm)')
     ax.view_init(elev=45, azim=135)
-    ax.set_box_aspect([1, 1, 0.5])
     plt.tight_layout()
     plt.show()
 
-# --- Entry Point (script run mode) ---
+# -------------------------------
+# ROI selection callback
+# -------------------------------
+roi_coords = []
 
+def line_select_callback(eclick, erelease):
+    x1, y1 = int(eclick.xdata), int(eclick.ydata)
+    x2, y2 = int(erelease.xdata), int(erelease.ydata)
+    roi_coords.clear()
+    roi_coords.append((min(x1, x2), min(y1, y2), abs(x2 - x1), abs(y2 - y1)))
+    plt.close()
+
+# -------------------------------
+# Show image for manual ROI selection
+# -------------------------------
+def select_roi(image):
+    fig, ax = plt.subplots()
+    ax.imshow(image, cmap='gray')
+    ax.set_title("Draw ROI with mouse, then close the window")
+    toggle_selector = RectangleSelector(ax, line_select_callback,
+                                        useblit=True,
+                                        button=[1], minspanx=5, minspany=5,
+                                        spancoords='pixels', interactive=True)
+    plt.show()
+    return roi_coords[0]
+
+# -------------------------------
+# Main reconstruction pipeline
+# -------------------------------
+def reconstruct_from_single_fringe(path):
+    img = imageio.imread(path)
+    gray = to_gray(img)
+    contrast = enhance_contrast(gray)
+
+    print("Please select the ROI area...")
+    x, y, w, h = select_roi(contrast)
+    roi = contrast[y:y + h, x:x + w]
+
+    grad_x, grad_y = compute_gradients(roi)
+    phi = poisson_solver(grad_x, grad_y)
+    height = phase_to_height(phi, Scalelength=0.062, angle_deg=60.0)
+    return roi, grad_x, grad_y, height
+
+# -------------------------------
+# Plot 2D results: original, gradients, height
+# -------------------------------
+def plot_all(fringe, grad_x, grad_y, height):
+    plt.figure(figsize=(14, 8))
+    titles = ['ROI Fringe', 'Gradient X', 'Gradient Y', 'Reconstructed Height (mm)']
+    images = [fringe, grad_x, grad_y, height]
+    cmaps = ['gray', 'seismic', 'seismic', 'jet']
+    for i in range(4):
+        plt.subplot(2, 2, i + 1)
+        plt.imshow(images[i], cmap=cmaps[i])
+        plt.title(titles[i])
+        plt.colorbar()
+        plt.axis('off') 
+    plt.tight_layout()
+    plt.show()
+
+# -------------------------------
+# Main Entry
+# -------------------------------
 if __name__ == "__main__":
-    image_paths = [
-        'C:\\Users\\Jiang\\Desktop\\samples\\c\\I1_crop_1755769228.tiff', 
-        'C:\\Users\\Jiang\\Desktop\\samples\\c\\I2_crop_1755769228.tiff',
-        'C:\\Users\\Jiang\\Desktop\\samples\\c\\I3_crop_1755769228.tiff',
-    ]
+    # Replace this path with your fringe image
+    image_path = "C:\\Users\\Jiang\\Desktop\\sample1\\16.tiff"  # Modify as needed
+    fringe, grad_x, grad_y, height = reconstruct_from_single_fringe(image_path)
+    plot_all(fringe, grad_x, grad_y, height)
+    plot_3d_surface(height)
 
-    results = process_phase_images(image_paths)
-    print(f"Selected ROI (x1,y1,x2,y2): {results['roi']}")
-    plot_results(results)
 
 ```
+
 
 
