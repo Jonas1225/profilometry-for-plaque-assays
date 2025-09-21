@@ -17,14 +17,25 @@ def compute_depth(unwrapped_phi, Scalelength=0.062, angle_deg=60.0):
         depth_mm : 2D ndarray of float
             Reconstructed depth map in millimeters.
     """
-    # Step 1: Calculate pitch of the projected pattern in meters
-    pitch_m = Scalelength / 22  # 22 fringes in the scale region
+    # Display geometry
+    N_pixels = 22  # measured number of pixels between fringes
+    P_pixel = (Scalelength * 1000) / 480.0  # single pixel size in mm
+    λ_fringe = N_pixels * P_pixel           # Fringe period (mm)
 
-    # Step 2: Convert angle to radians
-    angle_rad = np.deg2rad(angle_deg)
+    # Setup distances
+    d_display = 150.0  # mm
+    d_camera  = 100.0  # mm
+    G = (d_display + d_camera) / d_camera  # Geometric factor
 
-    # Step 3: Apply triangulation formula
-    depth_m = (pitch_m / (2 * np.pi * np.tan(angle_rad))) * unwrapped_phi
+    # Reflection correction
+    R = 1.0 / np.sin(np.deg2rad(angle_deg))
 
-    # Step 4: Convert to millimeters
-    return depth_m * 1000.0
+    # Optical magnification (set from your system)
+    M = 100
+
+    # Conversion factor (mm/rad)
+    K = (λ_fringe * G * R) / (2.0 * np.pi * M)
+
+    # Depth map in µm
+    depth_um = K * unwrapped_phi * 1000.0
+    return depth_um
