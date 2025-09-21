@@ -281,7 +281,7 @@ profilometry-for-plaque-assays/
 - Jonas1225
 - GitHub: [@Jonas1225](https://github.com/Jonas1225)
 
-'''bash
+```bash
 import numpy as np
 import imageio.v2 as imageio
 import matplotlib.pyplot as plt
@@ -556,8 +556,9 @@ if __name__ == "__main__":
     print(f"Selected ROI (x1,y1,x2,y2): {results['roi']}")
     plot_results(results)
 
+```
 
-'''
+
 
 
 
