@@ -302,10 +302,7 @@ from matplotlib.widgets import RectangleSelector
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 
-from scipy.ndimage import gaussian_filter  # 添加在顶部 import 区域
-
-
-
+from scipy.ndimage import gaussian_filter  # For optional Gaussian filtering
 # -------------------------------
 # Convert image to grayscale
 # -------------------------------
@@ -510,6 +507,7 @@ if __name__ == "__main__":
 
 
 ```
+
 
 
 
