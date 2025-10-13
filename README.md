@@ -302,6 +302,10 @@ from matplotlib.widgets import RectangleSelector
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 
+from scipy.ndimage import gaussian_filter  # 添加在顶部 import 区域
+
+
+
 # -------------------------------
 # Convert image to grayscale
 # -------------------------------
@@ -389,6 +393,28 @@ def compute_depth(unwrapped_phi, Scalelength=0.062, angle_deg=60.0):
     return depth_um
 
 # -------------------------------
+# Remove best-fit plane from height map
+# -------------------------------
+def remove_plane(height):
+    h, w = height.shape
+    X, Y = np.meshgrid(np.arange(w), np.arange(h))
+    
+    # Flatten for linear regression
+    X_flat = X.ravel()
+    Y_flat = Y.ravel()
+    Z_flat = height.ravel()
+    
+    # Plane: Z = aX + bY + c
+    A = np.c_[X_flat, Y_flat, np.ones_like(X_flat)]
+    C, _, _, _ = np.linalg.lstsq(A, Z_flat, rcond=None)  # Solve for [a, b, c]
+    
+    # Generate fitted plane
+    plane = (C[0] * X + C[1] * Y + C[2])
+    flat_height = height - plane
+    return flat_height
+
+
+# -------------------------------
 # Plot 3D surface
 # -------------------------------
 def plot_3d_surface(height):
@@ -436,6 +462,7 @@ def select_roi(image):
 # -------------------------------
 # Main reconstruction pipeline
 # -------------------------------
+
 def reconstruct_from_single_fringe(path):
     img = imageio.imread(path)
     gray = to_gray(img)
@@ -445,17 +472,21 @@ def reconstruct_from_single_fringe(path):
     x, y, w, h = select_roi(contrast)
     roi = contrast[y:y + h, x:x + w]
 
-    grad_x, grad_y = compute_gradients(roi)
+    # --- 添加高斯滤波 ---
+    roi_filtered = gaussian_filter(roi, sigma=1)  # sigma=1 可调
+    # ----------------------
+
+    grad_x, grad_y = compute_gradients(roi_filtered)
     phi = poisson_solver(grad_x, grad_y)
-    height = phase_to_height(phi, Scalelength=0.062, angle_deg=60.0)
-    return roi, grad_x, grad_y, height
+    height = compute_depth(phi, Scalelength=0.062, angle_deg=60.0)
+    return roi_filtered, grad_x, grad_y, height
 
 # -------------------------------
 # Plot 2D results: original, gradients, height
 # -------------------------------
 def plot_all(fringe, grad_x, grad_y, height):
     plt.figure(figsize=(14, 8))
-    titles = ['ROI Fringe', 'Gradient X', 'Gradient Y', 'Reconstructed Height (mm)']
+    titles = ['ROI Fringe', 'Gradient X', 'Gradient Y', 'Reconstructed Height (µm)']
     images = [fringe, grad_x, grad_y, height]
     cmaps = ['gray', 'seismic', 'seismic', 'jet']
     for i in range(4):
@@ -471,13 +502,15 @@ def plot_all(fringe, grad_x, grad_y, height):
 # Main Entry
 # -------------------------------
 if __name__ == "__main__":
-    # Replace this path with your fringe image
-    image_path = "C:\\Users\\Jiang\\Desktop\\sample1\\16.tiff"  # Modify as needed
+    image_path = "C:\\Users\\Jiang\\Desktop\\sample\\1.tiff"  # Modify as needed
     fringe, grad_x, grad_y, height = reconstruct_from_single_fringe(image_path)
-    plot_all(fringe, grad_x, grad_y, height)
-    plot_3d_surface(height)
+    flat_height = remove_plane(height)  # << REMOVE PLANE HERE
+    plot_all(fringe, grad_x, grad_y, flat_height)
+    plot_3d_surface(flat_height)
+
 
 ```
+
 
 
 
