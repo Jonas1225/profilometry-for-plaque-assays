@@ -93,7 +93,7 @@ def float_to_uint16(image):
 
 
 def process_and_display(
-    viewer, I1, I2, I3, scale_length, angle_deg, save_dir, save_intermediates
+    viewer, I1, I2, I3, scale_length,  save_dir, save_intermediates
 ):
     """Shared processing for captured or selected images."""
 
@@ -115,7 +115,7 @@ def process_and_display(
     phi_unwrapped = unwrap_phase(phi_wrapped)
 
     # Step 3: Height map
-    Z = compute_depth(phi_unwrapped, scale_length, angle_deg)
+    Z = compute_depth(phi_unwrapped, scale_length)
     Z_flat, _ = remove_plane(Z)
 
     # Step 4: Saving
@@ -160,7 +160,7 @@ def process_and_display(
         )
 
         # Also save raw data as .npy
-        np.save(os.path.join(save_dir, f"Z_Flat_{timestamp}.npy"), Z_flat) 
+        np.save(os.path.join(save_dir, f"Z_Flat_{timestamp}.npy"), Z_flat)
         show_info(f"Processing complete. Results saved to: {save_dir}")
 
     # Step 5: Display results in viewer
@@ -194,7 +194,6 @@ def has_dock_widget(viewer, name: str):
     I2_layer={"label": "Image I2"},
     I3_layer={"label": "Image I3"},
     Scalelength={"label": "TFT Scale Length (m)", "min": 0.001, "step": 0.001},
-    angle_deg={"label": "Projection Angle (°)", "min": 0.0, "max": 90.0},
     esp32_port={"label": "ESP32 Serial Port", "value": "COM3"},  # NEW: Added ESP32 port control
     save_dir={"widget_type": FileEdit, "label": "Save Directory", "mode": "d"},
     save_intermediates={
@@ -209,7 +208,6 @@ def phase_3step_widget(
     I2_layer: ImageData = None,
     I3_layer: ImageData = None,
     Scalelength: float = 0.062,  # Default TFT display length in meters
-    angle_deg: float = 60.0,
     esp32_port: str = "COM3",  # NEW: Added ESP32 port parameter
     save_dir: str = ".",
     save_intermediates: bool = True,
@@ -287,7 +285,6 @@ def phase_3step_widget(
                     I2_crop,
                     I3_crop,
                     Scalelength,
-                    angle_deg,
                     save_dir,
                     save_intermediates,
                 )
@@ -329,7 +326,6 @@ def phase_3step_widget(
                 I2_crop,
                 I3_crop,
                 Scalelength,
-                angle_deg,
                 save_dir,
                 save_intermediates,
             )
